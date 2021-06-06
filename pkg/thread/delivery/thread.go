@@ -28,7 +28,7 @@ type ThreadDeliveryInterface interface {
 }
 
 type ThreadDelivery struct {
-	ThreadUsecase usecase.ThreadUsecase
+	ThreadUsecase usecase.ThreadUsecaseInterface
 	PostUsecase   usecase2.PostUsecaseInterface
 }
 
@@ -52,7 +52,11 @@ func (u ThreadDelivery) GetAllPostByThread(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	response.Process(response.LoggerFunc("Посты созданы", log.Println), response.ResponseFunc(w, http.StatusOK, posts))
+	if posts == nil {
+		posts = make([]models.Post, 0)
+	}
+
+	response.Process(response.LoggerFunc("Найдены посты по ветке", log.Println), response.ResponseFunc(w, http.StatusOK, posts))
 }
 
 func (u ThreadDelivery) CreatePost(w http.ResponseWriter, r *http.Request) {

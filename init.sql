@@ -1,10 +1,13 @@
-CREATE EXTENSION IF NOT EXISTS CITEXT;
+DROP SCHEMA IF EXISTS parkmaildb CASCADE;
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE SCHEMA parkmaildb;
 
 DROP TABLE IF EXISTS parkmaildb."User" CASCADE;
 DROP TABLE IF EXISTS parkmaildb."Post" CASCADE;
 DROP TABLE IF EXISTS parkmaildb."Thread" CASCADE;
 DROP TABLE IF EXISTS parkmaildb."Forum" CASCADE;
 DROP TABLE IF EXISTS parkmaildb."Vote" CASCADE;
+DROP TABLE IF EXISTS parkmaildb."Users_by_Forum" CASCADE;
 
 
 CREATE TABLE parkmaildb."User"
@@ -21,7 +24,7 @@ CREATE TABLE parkmaildb."Forum"
     Id SERIAL PRIMARY KEY,
     Title TEXT NOT NULL,
     "user" CITEXT REFERENCES parkmaildb."User"(NickName) NOT NULL,
-    Slug TEXT UNIQUE NOT NULL,
+    Slug CITEXT UNIQUE NOT NULL,
     Posts INT,
     Threads INT
 );
@@ -31,12 +34,12 @@ CREATE TABLE parkmaildb."Thread"
     Id SERIAL PRIMARY KEY,
     Title TEXT NOT NULL,
     Author CITEXT REFERENCES parkmaildb."User"(NickName) NOT NULL,
-    Forum TEXT REFERENCES parkmaildb."Forum"(Slug) NOT NULL,
+    Forum CITEXT REFERENCES parkmaildb."Forum"(Slug) NOT NULL,
     Message TEXT NOT NULL,
     Votes INT,
-    Slug TEXT,
-    Created TIMESTAMP,
-    CONSTRAINT uniq UNIQUE (Title, Forum)
+    Slug CITEXT UNIQUE DEFAULT citext(1),
+    Created TIMESTAMP WITH TIME ZONE
+--     CONSTRAINT uniq UNIQUE (Title, Forum)
 );
 
 CREATE TABLE parkmaildb."Post"
@@ -46,16 +49,16 @@ CREATE TABLE parkmaildb."Post"
     Author CITEXT REFERENCES parkmaildb."User"(NickName) NOT NULL,
     Message TEXT NOT NULL,
     IsEdited bool NOT NULL DEFAULT FALSE,
-    Forum TEXT REFERENCES parkmaildb."Forum"(Slug) NOT NULL,
+    Forum CITEXT REFERENCES parkmaildb."Forum"(Slug) NOT NULL,
     Thread INT REFERENCES parkmaildb."Thread"(Id) NOT NULL,
-    Created TIMESTAMP DEFAULT now(),
-    Path INT[]
+    Created TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    Path INT[] DEFAULT ARRAY []::INTEGER[]
 );
 
 CREATE TABLE parkmaildb."Users_by_Forum"
 (
     Id SERIAL PRIMARY KEY,
-    Forum TEXT NOT NULL,
+    Forum CITEXT NOT NULL,
     "user" CITEXT REFERENCES parkmaildb."User"(NickName) NOT NULL,
     CONSTRAINT onlyOneUser UNIQUE (Forum, "user")
 );
@@ -83,24 +86,11 @@ CREATE TRIGGER create_thread_trigger
     AFTER INSERT ON parkmaildb."Thread"
     FOR EACH ROW EXECUTE PROCEDURE inc_threads_of_forum();
 
--- добавление нового форума
-CREATE OR REPLACE FUNCTION add_user_to_tmp() RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO parkmaildb."Users_by_Forum" (forum, "user") VALUES (NEW.slug, NEW."user")
-    ON CONFLICT DO NOTHING;
-    RETURN NULL;
-END
-$$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER create_forum_trigger
-    AFTER INSERT ON parkmaildb."Forum"
-    FOR EACH ROW EXECUTE PROCEDURE add_user_to_tmp();
-
 -- добавление нового голоса
 CREATE OR REPLACE FUNCTION add_new_voice() RETURNS TRIGGER AS $$
 BEGIN
     UPDATE parkmaildb."Thread" t SET votes = t.votes + NEW.Value WHERE t.Id = New.threadid;
-    RETURN;
+    RETURN NULL;
 END
 $$ LANGUAGE 'plpgsql';
 
@@ -110,20 +100,12 @@ CREATE TRIGGER voice_trigger
 
 -- Изменение голоса
 CREATE OR REPLACE FUNCTION change_voice() RETURNS TRIGGER AS $$
-DECLARE
-    voice INT;
 BEGIN
-    IF old.value = new.value
-    THEN RETURN NULL;
-    END IF;
 
-    IF old.value = -1
-    THEN voice = 2;
-    ELSE voice = -2;
+    IF old.value <> new.value
+    THEN UPDATE parkmaildb."Thread" t SET votes = (t.votes + new.value * 2) WHERE t.Id = New.threadid;
     END IF;
-
-    UPDATE parkmaildb."Thread" t SET votes = t.votes + voice WHERE t.Id = New.threadid;
-    RETURN NULL;
+    RETURN new;
 END
 $$ LANGUAGE 'plpgsql';
 
@@ -133,15 +115,13 @@ CREATE TRIGGER voice_update_trigger
 
 -- Добавление поста
 CREATE OR REPLACE FUNCTION add_post() RETURNS TRIGGER AS $$
-DECLARE
-    voice INT;
 BEGIN
     --     увеличить счетчик постов в форуме
     UPDATE parkmaildb."Forum" SET posts = posts + 1 WHERE Slug = NEW.forum;
-    --     добавить пользователя в таблицу форум-user
+--     добавить пользователя в таблицу форум-user
     INSERT INTO parkmaildb."Users_by_Forum" (forum, "user") VALUES (NEW.forum, NEW.author)
     ON CONFLICT DO NOTHING;
-    --     прописать путь
+--     прописать путь
     NEW.path = (SELECT P.path FROM parkmaildb."Post" P WHERE P.id = NEW.parent LIMIT 1) || NEW.id;
     RETURN NEW;
 END

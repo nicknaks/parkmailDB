@@ -34,7 +34,7 @@ func config() *http.Server {
 	Db := repository.Init()
 	userUsecase := usecase.UserUsecase{DB: &repostitory.UserRepository{DB: Db}}
 	forumUsecase := usecase2.ForumUsecase{DB: &repository2.ForumRepository{DB: Db}}
-	threadUsecase := usecase3.ThreadUsecase{DB: &repository3.ThreadRepository{DB: Db}}
+	threadUsecase := usecase3.ThreadUsecase{ThreadDB: &repository3.ThreadRepository{DB: Db}, ForumDB: &repository2.ForumRepository{DB: Db}}
 	postUsecase := usecase4.PostUsecase{PostDB: &repository4.PostRepository{DB: Db}, ThreadDB: &repository3.ThreadRepository{DB: Db}}
 	serviceUsecase := usecase5.ServiceUsecase{DB: repository5.ServiceRepository{DB: Db, Status: &status}}
 
@@ -65,7 +65,7 @@ func config() *http.Server {
 	service.SetHandlersForService(subRouter)
 
 	s := http.Server{
-		Addr:    "localhost:8001",
+		Addr:    ":5000",
 		Handler: mainRouter,
 	}
 
@@ -74,5 +74,6 @@ func config() *http.Server {
 
 func main() {
 	server := config()
+	log.Println("Server Start")
 	log.Fatalln(server.ListenAndServe())
 }

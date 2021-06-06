@@ -26,7 +26,7 @@ func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
 	}
 
 	log.Println(err)
-	rows, err := u.DB.Queryx(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1 OR email = $2`,
+	rows, err := u.DB.Queryx(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE lower(nickname) = lower($1) OR lower(email) = lower($2)`,
 		user.Nickname, user.Email)
 	if err != nil {
 		log.Println(err)
@@ -47,8 +47,8 @@ func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 	var newUser models.User
 
 	err := u.DB.QueryRowx(`UPDATE parkmaildb."User" 
-					SET fullname = $1, about = $2, email = $3 
-					WHERE nickname = $4 
+					SET fullname = COALESCE(NULLIF($1, ''), fullname), about = COALESCE(NULLIF($2, ''), about), email = COALESCE(NULLIF($3, ''), email)
+					WHERE lower(nickname) = lower($4) 
 					RETURNING nickname, fullname, about, email`,
 		user.Fullname, user.About, user.Email, user.Nickname).
 		Scan(&newUser.Nickname, &newUser.Fullname, &newUser.About, &newUser.Email)
@@ -63,8 +63,8 @@ func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 func (u UserRepository) GetUser(nickname string) (models.User, error) {
 	var user models.User = models.User{Nickname: nickname}
 
-	err := u.DB.QueryRow(`SELECT u.fullname, u.about, u.email FROM parkmaildb."User" u WHERE u.nickname = $1`,
-		nickname).Scan(&user.Fullname, &user.About, &user.Email)
+	err := u.DB.QueryRow(`SELECT u.nickname, u.fullname, u.about, u.email FROM parkmaildb."User" u WHERE lower(u.nickname) = lower($1)`,
+		nickname).Scan(&user.Nickname, &user.Fullname, &user.About, &user.Email)
 	if err != nil {
 		log.Println(err)
 		return models.User{}, err

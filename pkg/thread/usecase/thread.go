@@ -3,6 +3,7 @@ package usecase
 import (
 	"encoding/json"
 	"forum/internal/utils/utils"
+	repository2 "forum/pkg/forum/repository"
 	"forum/pkg/models"
 	"forum/pkg/thread/repository"
 	"github.com/pkg/errors"
@@ -11,34 +12,44 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 type ThreadUsecaseInterface interface {
 	CreateThread(thread models.Thread) (models.Thread, int, error)
-
 	ParseJsonToThread(body io.ReadCloser) (models.Thread, error)
 	GetThreadByRequest(body io.ReadCloser, vars map[string]string) (models.Thread, bool)
 	FindThreadsByParams(slug string, params models.ParamsForSearch) ([]models.Thread, bool)
 	ParseJsonToUpdateThread(body io.ReadCloser) (models.ThreadUpdate, error)
 	UpdateThread(update models.ThreadUpdate, slugOrId string) (models.Thread, bool)
+	SetVote(vote models.Vote, slugOrId string) (models.Thread, bool)
+	ParseJsonToVote(body io.ReadCloser) (models.Vote, error)
+	GetThreadInfo(slugOrId string) (models.Thread, bool)
 }
 
 type ThreadUsecase struct {
-	DB repository.ThreadRepositoryInterface
+	ThreadDB repository.ThreadRepositoryInterface
+	ForumDB  repository2.ForumRepositoryInterface
 }
 
 func (u ThreadUsecase) FindThreadsByParams(slug string, params models.ParamsForSearch) ([]models.Thread, bool) {
-	threads, ok := u.DB.FindThreads(slug, params)
+	threads, ok := u.ThreadDB.FindThreads(slug, params)
 	if !ok {
 		return nil, false
+	}
+
+	if threads == nil {
+		threads = make([]models.Thread, 0)
+		_, ok = u.ForumDB.GetForumInfo(slug)
+		if !ok {
+			return nil, false
+		}
 	}
 
 	return threads, true
 }
 
 func (u ThreadUsecase) CreateThread(thread models.Thread) (models.Thread, int, error) {
-	insertedThread, err := u.DB.CreateThread(thread)
+	insertedThread, err := u.ThreadDB.CreateThread(thread)
 	if err == nil {
 		return insertedThread, http.StatusCreated, nil
 	}
@@ -49,9 +60,9 @@ func (u ThreadUsecase) CreateThread(thread models.Thread) (models.Thread, int, e
 		return models.Thread{}, http.StatusNotFound, errors.New(models.ErrUserUnknown)
 	}
 
-	thread, ok := u.DB.GetThreadInfo(thread.Title, thread.Forum)
+	thread, ok := u.ThreadDB.GetThreadInfoBySlug(thread.Slug)
 	if !ok {
-		return models.Thread{}, http.StatusNotFound, errors.New(models.ErrUserUnknown)
+		return models.Thread{}, http.StatusNotFound, errors.New(models.ErrForumNotFound)
 	}
 
 	return thread, http.StatusConflict, nil
@@ -69,7 +80,6 @@ func (u ThreadUsecase) ParseJsonToThread(body io.ReadCloser) (models.Thread, err
 	}
 
 	thread.Votes = 0
-	thread.Created = time.Now()
 	return thread, err
 }
 
@@ -91,14 +101,14 @@ func (u ThreadUsecase) GetThreadByRequest(body io.ReadCloser, vars map[string]st
 func (u ThreadUsecase) GetThreadInfo(slugOrId string) (models.Thread, bool) {
 	id, err := strconv.Atoi(slugOrId)
 	if err != nil {
-		return u.DB.GetThreadInfoBySlug(slugOrId)
+		return u.ThreadDB.GetThreadInfoBySlug(slugOrId)
 	}
 
-	return u.DB.GetThreadInfoById(id)
+	return u.ThreadDB.GetThreadInfoById(id)
 }
 
 func (u ThreadUsecase) UpdateThread(update models.ThreadUpdate, slugOrId string) (models.Thread, bool) {
-	return u.DB.UpdateThread(update, slugOrId)
+	return u.ThreadDB.UpdateThread(update, slugOrId)
 }
 
 func (u ThreadUsecase) ParseJsonToUpdateThread(body io.ReadCloser) (models.ThreadUpdate, error) {
@@ -139,18 +149,18 @@ func (u ThreadUsecase) SetVote(vote models.Vote, slugOrId string) (models.Thread
 	id, err := strconv.Atoi(slugOrId)
 	if err != nil {
 		var ok bool
-		id, ok = u.DB.GetThreadIdBySlug(slugOrId)
+		id, ok = u.ThreadDB.GetThreadIdBySlug(slugOrId)
 		if !ok {
 			return models.Thread{}, false
 		}
 	}
 
-	ok := u.DB.SetVote(vote, id)
+	ok := u.ThreadDB.SetVote(vote, id)
 	if !ok {
 		return models.Thread{}, false
 	}
 
-	thread, ok := u.DB.GetThreadInfoById(id)
+	thread, ok := u.ThreadDB.GetThreadInfoById(id)
 	if !ok {
 		return models.Thread{}, false
 	}

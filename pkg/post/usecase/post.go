@@ -19,7 +19,7 @@ import (
 type PostUsecaseInterface interface {
 	ParseJsonToPosts(body io.ReadCloser) ([]models.Post, error)
 	ParseJsonToPostUpdate(body io.ReadCloser) (models.PostUpdate, error)
-	CreatePosts(posts []models.Post, threadId int, forumName string) ([]models.Post, int, error)
+	CreatePosts(posts models.Posts, threadId int, forumName string) ([]models.Post, int, error)
 	ChangeMessage(updateMessage models.PostUpdate, id string) (models.Post, bool)
 	GetParamsByQuery(query url.Values) models.FullPostParams
 	GetAllInfo(params models.FullPostParams, id string) (models.FullPost, bool)
@@ -37,6 +37,12 @@ func (u PostUsecase) GetPostByThread(slugOrId string, limit int, since int, sort
 		var ok bool
 		id, ok = u.ThreadDB.GetThreadIdBySlug(slugOrId)
 		if !ok {
+			var re []models.Post
+			return re, false
+		}
+	} else {
+		_, ok := u.ThreadDB.GetThreadInfoById(id)
+		if !ok {
 			return nil, false
 		}
 	}
@@ -45,14 +51,27 @@ func (u PostUsecase) GetPostByThread(slugOrId string, limit int, since int, sort
 		limit = 100
 	}
 
+	var ok bool
+	var posts []models.Post
 	switch sort {
 	case "tree":
-		return u.PostDB.GetPostsTree(id, limit, since, desc)
+		posts, ok = u.PostDB.GetPostsTree(id, limit, since, desc)
 	case "parent_tree":
-		return u.PostDB.GetPostsParentTree(id, limit, since, desc)
+		log.Println("parent_tree")
+		posts, ok = u.PostDB.GetPostsParentTree(id, limit, since, desc)
 	default:
-		return u.PostDB.GetAllPostByThread(id, limit, since, desc)
+		posts, ok = u.PostDB.GetAllPostByThread(id, limit, since, desc)
 	}
+
+	if !ok {
+		var re []models.Post
+		return re, false
+	}
+	if posts == nil {
+		var re []models.Post
+		return re, true
+	}
+	return posts, true
 }
 
 func (u PostUsecase) GetAllInfo(params models.FullPostParams, id string) (models.FullPost, bool) {
@@ -111,18 +130,21 @@ func (u PostUsecase) ParseJsonToPostUpdate(body io.ReadCloser) (models.PostUpdat
 	return postUpdate, err
 }
 
-func (u PostUsecase) CreatePosts(posts []models.Post, threadId int, forumName string) ([]models.Post, int, error) {
+func (u PostUsecase) CreatePosts(posts models.Posts, threadId int, forumName string) ([]models.Post, int, error) {
 	addPosts, err := u.PostDB.AddPosts(posts, threadId, forumName)
 	if err == nil {
+		if addPosts == nil {
+			addPosts = []models.Post{}
+		}
 		return addPosts, http.StatusCreated, nil
 	}
 
 	code := utils.PgxErrorCode(err)
 	if code == "23503" {
-		return nil, http.StatusNotFound, errors.New(models.ErrUserUnknown)
+		return []models.Post{}, http.StatusNotFound, errors.New(models.ErrUserUnknown)
 	}
 
-	return nil, http.StatusConflict, errors.New("Parent Post is Missing")
+	return []models.Post{}, http.StatusConflict, errors.New("Parent Post is Missing")
 }
 
 func (u PostUsecase) ParseJsonToPosts(body io.ReadCloser) ([]models.Post, error) {

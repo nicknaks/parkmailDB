@@ -2,6 +2,8 @@ package models
 
 import "time"
 
+type Posts []Post
+
 type Post struct {
 	Id       int       `json:"id"`
 	Parent   int64     `json:"parent"`

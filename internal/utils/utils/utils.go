@@ -2,6 +2,7 @@ package utils
 
 import (
 	"forum/pkg/models"
+	"github.com/google/uuid"
 	"github.com/gorilla/schema"
 	"github.com/jackc/pgx"
 	"log"
@@ -40,6 +41,12 @@ func ParseJsonToSearchParams(values url.Values) (models.ParamsForSearch, bool) {
 
 	return params, true
 }
+
+func IsValidUUID(u string) bool {
+	_, err := uuid.Parse(u)
+	return err == nil
+}
+
 func ParseJsonToGetPostsParams(values url.Values) (models.ParamsForGetPosts, bool) {
 	var params models.ParamsForGetPosts
 

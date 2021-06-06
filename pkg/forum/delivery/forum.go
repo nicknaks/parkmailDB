@@ -16,7 +16,6 @@ type ForumDeliveryInterface interface {
 	GetForumInfo(w http.ResponseWriter, r *http.Request)
 	CreateThread(w http.ResponseWriter, r *http.Request)
 	GetThreadsOfForum(w http.ResponseWriter, r *http.Request)
-
 	GetUsersOfForum(w http.ResponseWriter, r *http.Request)
 }
 
@@ -28,9 +27,7 @@ type ForumDelivery struct {
 func (u ForumDelivery) SetHandlersForForum(router *mux.Router) {
 	router.HandleFunc("/forum/create", u.CreateForum).Methods(http.MethodPost)
 	router.HandleFunc("/forum/{slug}/details", u.GetForumInfo).Methods(http.MethodGet)
-
 	router.HandleFunc("/forum/{slug}/create", u.CreateThread).Methods(http.MethodPost)
-
 	router.HandleFunc("/forum/{slug}/users", u.GetUsersOfForum).Methods(http.MethodGet)
 	router.HandleFunc("/forum/{slug}/threads", u.GetThreadsOfForum).Methods(http.MethodGet)
 }
@@ -96,7 +93,7 @@ func (d ForumDelivery) GetThreadsOfForum(w http.ResponseWriter, r *http.Request)
 
 	threads, ok := d.ThreadUsecase.FindThreadsByParams(slug, params)
 	if !ok {
-		ans := response.ErrorResponse{Err: models.ErrForumNotFound}
+		ans := response.ErrorResponse{Err: models.ErrThreadNotfound}
 		response.Process(response.LoggerFunc(ans.Error(), log.Println), response.ResponseFunc(w, http.StatusNotFound, ans))
 		return
 	}
@@ -115,12 +112,16 @@ func (d ForumDelivery) GetUsersOfForum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threads, ok := d.ForumUsecase.FindUsersOfForum(slug, params)
+	users, ok := d.ForumUsecase.FindUsersOfForum(slug, params)
 	if !ok {
 		ans := response.ErrorResponse{Err: models.ErrForumNotFound}
 		response.Process(response.LoggerFunc(ans.Error(), log.Println), response.ResponseFunc(w, http.StatusNotFound, ans))
 		return
 	}
 
-	response.Process(response.LoggerFunc("Return All threads By Forum", log.Println), response.ResponseFunc(w, http.StatusOK, threads))
+	if users == nil {
+		users = make([]models.User, 0)
+	}
+
+	response.Process(response.LoggerFunc("Return All users By Forum", log.Println), response.ResponseFunc(w, http.StatusOK, users))
 }

@@ -24,8 +24,13 @@ type ForumUsecase struct {
 
 func (u ForumUsecase) FindUsersOfForum(slug string, params models.ParamsForSearch) ([]models.User, bool) {
 	users, ok := u.DB.FindUsers(slug, params)
-	if !ok {
-		return nil, false
+	if !ok || len(users) == 0 {
+		_, ok = u.DB.GetForumInfo(slug)
+		if !ok {
+			return nil, false
+		}
+		var re []models.User
+		return re, true
 	}
 
 	return users, true
@@ -41,8 +46,11 @@ func (u ForumUsecase) GetInfoBySlug(slug string) (models.Forum, error) {
 }
 
 func (u ForumUsecase) CreateForum(forum models.Forum) (models.Forum, int, error) {
-	err := u.DB.CreateForum(forum)
+	log.Println(forum.User)
+	var err error
+	forum, err = u.DB.CreateForum(forum)
 	if err == nil {
+		log.Println(forum.User)
 		return forum, http.StatusCreated, nil
 	}
 
