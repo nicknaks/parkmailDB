@@ -12,13 +12,13 @@ ENV PGVER 12
 
 COPY init.sql /
 
-RUN apt-get -y update && apt-get install -y postgresql-$PGVER postgresql-contrib
+RUN apt-get -y update && apt-get install -y postgresql-$PGVER
 
 USER postgres
 
 RUN /etc/init.d/postgresql start &&\
     psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker';" &&\
-    createdb -E UTF8 docker &&\
+    createdb -E UTF8 -O docker docker &&\
     /etc/init.d/postgresql stop
 
 EXPOSE 5432
