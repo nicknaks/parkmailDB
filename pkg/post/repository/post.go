@@ -231,14 +231,13 @@ func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName str
 		return nil, errors.New("Cant Find Parent")
 	}
 
+	defer rows.Close()
+
 	for rows.Next() {
 		post := models.Post{}
 
 		err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created)
-		log.Println(1)
-		log.Println(post)
 		if err != nil || post.Author == "" {
-			rows.Close()
 			return nil, err
 		}
 
@@ -246,10 +245,8 @@ func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName str
 	}
 
 	if len(insertedPosts) == 0 {
-		rows.Close()
 		return nil, errors.New(models.ErrUserUnknown)
 	}
 
-	rows.Close()
 	return insertedPosts, nil
 }
