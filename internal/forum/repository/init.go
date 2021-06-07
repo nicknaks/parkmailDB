@@ -1,28 +1,41 @@
 package repository
 
 import (
-	"database/sql"
-	_ "github.com/jackc/pgx"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx"
 )
 
-func getPostgres() *sql.DB {
-	db, err := sql.Open("pgx", "dbname=docker user=docker password=docker host=127.0.0.1 port=5432 sslmode=disable")
-	//db, err := sql.Open("pgx", "dbname=postgres host=127.0.0.1 port=5432 sslmode=disable")
-	if err != nil {
-		panic("cant parse config" + err.Error())
-	}
-
-	err = db.Ping()
-	if err != nil {
-		panic("can`t ping db" + err.Error())
-	}
-
-	db.SetMaxOpenConns(100)
-
-	return db
+type Postgres struct {
+	DB *pgx.ConnPool
 }
 
-func Init() *sqlx.DB {
-	return sqlx.NewDb(getPostgres(), "psx")
+func NewPostgres() (*Postgres, error) {
+	conf := pgx.ConnConfig{
+		User:                 "docker",
+		Database:             "docker",
+		Password:             "docker",
+		PreferSimpleProtocol: false,
+	}
+
+	poolConf := pgx.ConnPoolConfig{
+		ConnConfig:     conf,
+		MaxConnections: 100,
+		AfterConnect:   nil,
+		AcquireTimeout: 0,
+	}
+	db, err := pgx.NewConnPool(poolConf)
+	if err != nil {
+		return nil, err
+	}
+	return &Postgres{
+		DB: db,
+	}, nil
+}
+
+func (p *Postgres) GetPostgres() *pgx.ConnPool {
+	return p.DB
+}
+
+func (p *Postgres) Close() error {
+	p.DB.Close()
+	return nil
 }

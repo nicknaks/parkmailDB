@@ -4,7 +4,7 @@ import (
 	"forum/internal/utils/utils"
 	"forum/pkg/models"
 	"github.com/gofrs/uuid"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx"
 	"log"
 	"strconv"
 )
@@ -21,12 +21,12 @@ type ThreadRepositoryInterface interface {
 }
 
 type ThreadRepository struct {
-	DB *sqlx.DB
+	DB *pgx.ConnPool
 }
 
 func (r ThreadRepository) GetThreadIdBySlug(slug string) (int, bool) {
 	id := -1
-	err := r.DB.QueryRowx(`SELECT id FROM parkmaildb."Thread" WHERE slug = $1`, slug).Scan(&id)
+	err := r.DB.QueryRow(`SELECT id FROM parkmaildb."Thread" WHERE slug = $1`, slug).Scan(&id)
 	if err != nil {
 		log.Println(err)
 		return -1, false
@@ -66,10 +66,10 @@ func (r ThreadRepository) UpdateThread(update models.ThreadUpdate, slugOrId stri
 	var thread models.Thread
 	id, err := strconv.Atoi(slugOrId)
 	if err != nil {
-		err = r.DB.QueryRowx(`UPDATE parkmaildb."Thread" SET title = COALESCE(NULLIF($1, ''), title), message = COALESCE(NULLIF($2, ''), message) WHERE slug = $3 RETURNING *`, update.Title, update.Message, slugOrId).
+		err = r.DB.QueryRow(`UPDATE parkmaildb."Thread" SET title = COALESCE(NULLIF($1, ''), title), message = COALESCE(NULLIF($2, ''), message) WHERE slug = $3 RETURNING *`, update.Title, update.Message, slugOrId).
 			Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 	} else {
-		err = r.DB.QueryRowx(`UPDATE parkmaildb."Thread" SET title = COALESCE(NULLIF($1, ''), title), message = COALESCE(NULLIF($2, ''), message) WHERE id = $3 RETURNING *`, update.Title, update.Message, id).
+		err = r.DB.QueryRow(`UPDATE parkmaildb."Thread" SET title = COALESCE(NULLIF($1, ''), title), message = COALESCE(NULLIF($2, ''), message) WHERE id = $3 RETURNING *`, update.Title, update.Message, id).
 			Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 	}
 
@@ -81,7 +81,7 @@ func (r ThreadRepository) UpdateThread(update models.ThreadUpdate, slugOrId stri
 
 func (r ThreadRepository) GetThreadInfoBySlug(slug string) (models.Thread, bool) {
 	var thread models.Thread
-	err := r.DB.QueryRowx(`SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE slug = $1`,
+	err := r.DB.QueryRow(`SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE slug = $1`,
 		slug).
 		Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 	if err != nil {
@@ -97,7 +97,7 @@ func (r ThreadRepository) GetThreadInfoBySlug(slug string) (models.Thread, bool)
 
 func (r ThreadRepository) GetThreadInfoById(id int) (models.Thread, bool) {
 	var thread models.Thread
-	err := r.DB.QueryRowx(`SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE id = $1`,
+	err := r.DB.QueryRow(`SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE id = $1`,
 		id).
 		Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 	if err != nil {
@@ -112,23 +112,23 @@ func (r ThreadRepository) GetThreadInfoById(id int) (models.Thread, bool) {
 }
 
 func (r ThreadRepository) FindThreads(slug string, params models.ParamsForSearch) ([]models.Thread, bool) {
-	var rows *sqlx.Rows
+	var rows *pgx.Rows
 	var err error
 
 	if params.Since == "" {
 		if params.Desc {
-			rows, err = r.DB.Queryx(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 ORDER BY t.created DESC LIMIT $2`,
+			rows, err = r.DB.Query(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 ORDER BY t.created DESC LIMIT $2`,
 				slug, params.Limit)
 		} else {
-			rows, err = r.DB.Queryx(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 ORDER BY t.created LIMIT $2`,
+			rows, err = r.DB.Query(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 ORDER BY t.created LIMIT $2`,
 				slug, params.Limit)
 		}
 	} else {
 		if params.Desc {
-			rows, err = r.DB.Queryx(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 AND t.created <= $2 ORDER BY t.created DESC LIMIT $3`,
+			rows, err = r.DB.Query(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 AND t.created <= $2 ORDER BY t.created DESC LIMIT $3`,
 				slug, params.Since, params.Limit)
 		} else {
-			rows, err = r.DB.Queryx(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 AND t.created >= $2 ORDER BY t.created  LIMIT $3`,
+			rows, err = r.DB.Query(`SELECT t.id, t.title, t.author, t.forum, t.message, t.votes, t.slug, t.created FROM parkmaildb."Thread" t WHERE t.forum = $1 AND t.created >= $2 ORDER BY t.created  LIMIT $3`,
 				slug, params.Since, params.Limit)
 		}
 	}
@@ -159,7 +159,7 @@ func (r ThreadRepository) FindThreads(slug string, params models.ParamsForSearch
 func (r ThreadRepository) GetThreadInfo(title string, forum string) (models.Thread, bool) {
 	var thread models.Thread
 
-	err := r.DB.QueryRowx(`SELECT t.id, title, author, forum, message, votes, slug, created from parkmaildb."Thread" t WHERE t.title = $1 AND t.forum = $2`,
+	err := r.DB.QueryRow(`SELECT t.id, title, author, forum, message, votes, slug, created from parkmaildb."Thread" t WHERE t.title = $1 AND t.forum = $2`,
 		title, forum).
 		Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 
@@ -183,7 +183,7 @@ func (r *ThreadRepository) CreateThread(thread models.Thread) (models.Thread, er
 		thread.Slug = gen.String()
 	}
 
-	err = r.DB.QueryRowx(`INSERT INTO parkmaildb."Thread" (title, author, forum, message, votes, slug, created) VALUES ($1,(SELECT nickname from parkmaildb."User" where nickname = $2),(SELECT slug from parkmaildb."Forum"  where slug = $3),$4,0,$5,$6) RETURNING id, forum, author, slug`,
+	err = r.DB.QueryRow(`INSERT INTO parkmaildb."Thread" (title, author, forum, message, votes, slug, created) VALUES ($1,(SELECT nickname from parkmaildb."User" where nickname = $2),(SELECT slug from parkmaildb."Forum"  where slug = $3),$4,0,$5,$6) RETURNING id, forum, author, slug`,
 		thread.Title, thread.Author, thread.Forum, thread.Message, thread.Slug, thread.Created).
 		Scan(&thread.Id, &thread.Forum, &thread.Author, &thread.Slug)
 

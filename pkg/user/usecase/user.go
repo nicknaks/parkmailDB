@@ -1,11 +1,11 @@
 package usecase
 
 import (
-	"database/sql"
 	"encoding/json"
 	"forum/internal/utils/utils"
 	"forum/pkg/models"
 	"forum/pkg/user/repostitory"
+	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -66,7 +66,8 @@ func (u UserUsecase) ChangeUser(user models.User) (models.User, int, error) {
 		return user, http.StatusOK, nil
 	}
 
-	if err == sql.ErrNoRows {
+	code := utils.PgxErrorCode(err)
+	if code == "23503" || err == pgx.ErrNoRows {
 		log.Println(err)
 		return models.User{}, http.StatusNotFound, err
 	}

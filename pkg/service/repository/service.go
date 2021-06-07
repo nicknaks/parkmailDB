@@ -2,7 +2,7 @@ package repository
 
 import (
 	"forum/pkg/models"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx"
 	"log"
 )
 
@@ -12,7 +12,7 @@ type ServiceRepositoryInterface interface {
 
 type ServiceRepository struct {
 	Status *models.Status
-	DB     *sqlx.DB
+	DB     *pgx.ConnPool
 }
 
 func (r ServiceRepository) CleanDb() bool {
@@ -28,10 +28,10 @@ func (r ServiceRepository) CleanDb() bool {
 func (r ServiceRepository) GetStatus() models.Status {
 	status := models.Status{}
 
-	err := r.DB.QueryRowx(`SELECT COUNT(*) FROM parkmaildb."Post"`).Scan(&status.Post)
-	err = r.DB.QueryRowx(`SELECT COUNT(*) FROM parkmaildb."User"`).Scan(&status.User)
-	err = r.DB.QueryRowx(`SELECT COUNT(*) FROM parkmaildb."Forum"`).Scan(&status.Forum)
-	err = r.DB.QueryRowx(`SELECT COUNT(*) FROM parkmaildb."Thread"`).Scan(&status.Thread)
+	err := r.DB.QueryRow(`SELECT COUNT(*) FROM parkmaildb."Post"`).Scan(&status.Post)
+	err = r.DB.QueryRow(`SELECT COUNT(*) FROM parkmaildb."User"`).Scan(&status.User)
+	err = r.DB.QueryRow(`SELECT COUNT(*) FROM parkmaildb."Forum"`).Scan(&status.Forum)
+	err = r.DB.QueryRow(`SELECT COUNT(*) FROM parkmaildb."Thread"`).Scan(&status.Thread)
 	if err != nil {
 		log.Println(err)
 	}

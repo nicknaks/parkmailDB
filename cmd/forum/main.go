@@ -28,15 +28,17 @@ import (
 )
 
 func config() *http.Server {
-	//db
 	status := models.StatusInit()
+	Db, err := repository.NewPostgres()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	Db := repository.Init()
-	userUsecase := usecase.UserUsecase{DB: &repostitory.UserRepository{DB: Db}}
-	forumUsecase := usecase2.ForumUsecase{DB: &repository2.ForumRepository{DB: Db}}
-	threadUsecase := usecase3.ThreadUsecase{ThreadDB: &repository3.ThreadRepository{DB: Db}, ForumDB: &repository2.ForumRepository{DB: Db}}
-	postUsecase := usecase4.PostUsecase{PostDB: &repository4.PostRepository{DB: Db}, ThreadDB: &repository3.ThreadRepository{DB: Db}}
-	serviceUsecase := usecase5.ServiceUsecase{DB: repository5.ServiceRepository{DB: Db, Status: &status}}
+	userUsecase := usecase.UserUsecase{DB: &repostitory.UserRepository{DB: Db.GetPostgres()}}
+	forumUsecase := usecase2.ForumUsecase{DB: &repository2.ForumRepository{DB: Db.GetPostgres()}}
+	threadUsecase := usecase3.ThreadUsecase{ThreadDB: &repository3.ThreadRepository{DB: Db.GetPostgres()}, ForumDB: &repository2.ForumRepository{DB: Db.GetPostgres()}}
+	postUsecase := usecase4.PostUsecase{PostDB: &repository4.PostRepository{DB: Db.GetPostgres()}, ThreadDB: &repository3.ThreadRepository{DB: Db.GetPostgres()}}
+	serviceUsecase := usecase5.ServiceUsecase{DB: repository5.ServiceRepository{DB: Db.GetPostgres(), Status: &status}}
 
 	// logger
 	logrus.SetFormatter(&logrus.TextFormatter{})

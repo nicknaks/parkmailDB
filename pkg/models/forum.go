@@ -9,9 +9,9 @@ type Forum struct {
 	// Человекопонятный URL, уникальное поле.
 	Slug string `json:"slug"`
 	// Общее кол-во сообщений в данном форуме.
-	Posts float32 `json:"posts"`
+	Posts int64 `json:"posts"`
 	// Общее кол-во ветвей обсуждения в данном форуме.
-	Threads float32 `json:"threads"`
+	Threads int64 `json:"threads"`
 }
 
 type ParamsForSearch struct {

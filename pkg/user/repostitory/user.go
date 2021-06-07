@@ -2,9 +2,9 @@ package repostitory
 
 import (
 	"forum/pkg/models"
+	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
-	"github.com/jmoiron/sqlx"
 	"log"
 )
 
@@ -15,7 +15,7 @@ type UserRepositoryInterface interface {
 }
 
 type UserRepository struct {
-	DB *sqlx.DB
+	DB *pgx.ConnPool
 }
 
 func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
@@ -26,7 +26,7 @@ func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
 	}
 
 	log.Println(err)
-	rows, err := u.DB.Queryx(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1 OR email = $2`,
+	rows, err := u.DB.Query(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1 OR email = $2`,
 		user.Nickname, user.Email)
 	if err != nil {
 		log.Println(err)
@@ -46,7 +46,7 @@ func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
 func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 	var newUser models.User
 
-	err := u.DB.QueryRowx(`UPDATE parkmaildb."User" 
+	err := u.DB.QueryRow(`UPDATE parkmaildb."User" 
 					SET fullname = COALESCE(NULLIF($1, ''), fullname), about = COALESCE(NULLIF($2, ''), about), email = COALESCE(NULLIF($3, ''), email)
 					WHERE nickname = $4 
 					RETURNING nickname, fullname, about, email`,
@@ -54,6 +54,7 @@ func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 		Scan(&newUser.Nickname, &newUser.Fullname, &newUser.About, &newUser.Email)
 
 	if err != nil {
+		log.Println(err)
 		return models.User{}, err
 	}
 

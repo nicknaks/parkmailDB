@@ -5,7 +5,7 @@ import "time"
 // Thread Ветка обсуждения на форуме.
 type Thread struct {
 	// Идентификатор ветки обсуждения.
-	Id float32 `json:"id,omitempty"`
+	Id int64 `json:"id,omitempty"`
 	// Заголовок ветки обсуждения.
 	Title string `json:"title"`
 	// Пользователь, создавший данную тему.
@@ -15,7 +15,7 @@ type Thread struct {
 	// Описание ветки обсуждения.
 	Message string `json:"message"`
 	// Кол-во голосов непосредственно за данное сообщение форума.
-	Votes float32 `json:"votes"`
+	Votes int64 `json:"votes"`
 	// Человекопонятный URL. В данной структуре slug опционален и не может быть числом.
 	Slug string `json:"slug"`
 	// Дата создания ветки на форуме.
