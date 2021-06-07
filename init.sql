@@ -10,7 +10,7 @@ DROP TABLE IF EXISTS parkmaildb."Vote" CASCADE;
 DROP TABLE IF EXISTS parkmaildb."Users_by_Forum" CASCADE;
 
 
-CREATE TABLE parkmaildb."User"
+CREATE UNLOGGED TABLE parkmaildb."User"
 (
     Id SERIAL PRIMARY KEY,
     NickName CITEXT UNIQUE NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE parkmaildb."User"
     Email CITEXT UNIQUE NOT NULL
 );
 
-CREATE TABLE parkmaildb."Forum"
+CREATE UNLOGGED TABLE parkmaildb."Forum"
 (
     Id SERIAL PRIMARY KEY,
     Title TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE parkmaildb."Forum"
     Threads INT
 );
 
-CREATE TABLE parkmaildb."Thread"
+CREATE UNLOGGED TABLE parkmaildb."Thread"
 (
     Id SERIAL PRIMARY KEY,
     Title TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE parkmaildb."Thread"
     Created TIMESTAMP WITH TIME ZONE
 );
 
-CREATE TABLE parkmaildb."Post"
+CREATE UNLOGGED TABLE parkmaildb."Post"
 (
     Id SERIAL PRIMARY KEY,
     Parent INT DEFAULT 0,
@@ -54,7 +54,7 @@ CREATE TABLE parkmaildb."Post"
     Path INT[] DEFAULT ARRAY []::INTEGER[]
 );
 
-CREATE TABLE parkmaildb."Users_by_Forum"
+CREATE UNLOGGED TABLE parkmaildb."Users_by_Forum"
 (
     Id SERIAL PRIMARY KEY,
     Forum CITEXT NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE parkmaildb."Users_by_Forum"
     CONSTRAINT onlyOneUser UNIQUE (Forum, "user")
 );
 
-CREATE TABLE parkmaildb."Vote"
+CREATE UNLOGGED TABLE parkmaildb."Vote"
 (
     Id SERIAL PRIMARY KEY,
     ThreadId INT REFERENCES parkmaildb."Thread"(id) NOT NULL,
