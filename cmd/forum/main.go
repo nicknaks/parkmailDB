@@ -34,6 +34,7 @@ func config() *http.Server {
 		log.Fatal(err)
 	}
 	if Db.ProcedureRequests() != nil {
+		log.Fatal(1)
 		log.Fatal(err)
 	}
 

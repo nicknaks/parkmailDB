@@ -18,16 +18,24 @@ type UserRepository struct {
 	DB *pgx.ConnPool
 }
 
+const (
+	InsertUser = `INSERT INTO parkmaildb."User" (nickname, fullname, about, email) VALUES ($1, $2, $3, $4)`
+	SelectUser = `SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1 OR email = $2`
+	UpdateUser = `UPDATE parkmaildb."User" 
+					SET fullname = COALESCE(NULLIF($1, ''), fullname), about = COALESCE(NULLIF($2, ''), about), email = COALESCE(NULLIF($3, ''), email)
+					WHERE nickname = $4 
+					RETURNING nickname, fullname, about, email`
+	SelectUserByNick = `SELECT u.nickname, u.fullname, u.about, u.email FROM parkmaildb."User" u WHERE u.nickname = $1`
+)
+
 func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
-	_, err := u.DB.Exec(`INSERT INTO parkmaildb."User" (nickname, fullname, about, email) VALUES ($1, $2, $3, $4)`,
-		user.Nickname, user.Fullname, user.About, user.Email)
+	_, err := u.DB.Exec("InsertUser", user.Nickname, user.Fullname, user.About, user.Email)
 	if err == nil {
 		return []models.User{user}, true
 	}
 
 	log.Println(err)
-	rows, err := u.DB.Query(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1 OR email = $2`,
-		user.Nickname, user.Email)
+	rows, err := u.DB.Query("SelectUser", user.Nickname, user.Email)
 	if err != nil {
 		log.Println(err)
 	}
@@ -36,20 +44,22 @@ func (u *UserRepository) AddUser(user models.User) ([]models.User, bool) {
 
 	for rows.Next() {
 		newUser := models.User{}
-		_ = rows.Scan(&newUser.Nickname, &newUser.Fullname, &newUser.About, &newUser.Email)
+		err = rows.Scan(&newUser.Nickname, &newUser.Fullname, &newUser.About, &newUser.Email)
 		users = append(users, newUser)
+		if err != nil {
+			rows.Close()
+			return []models.User{}, false
+		}
 	}
 
+	rows.Close()
 	return users, false
 }
 
 func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 	var newUser models.User
 
-	err := u.DB.QueryRow(`UPDATE parkmaildb."User" 
-					SET fullname = COALESCE(NULLIF($1, ''), fullname), about = COALESCE(NULLIF($2, ''), about), email = COALESCE(NULLIF($3, ''), email)
-					WHERE nickname = $4 
-					RETURNING nickname, fullname, about, email`,
+	err := u.DB.QueryRow("UpdateUser",
 		user.Fullname, user.About, user.Email, user.Nickname).
 		Scan(&newUser.Nickname, &newUser.Fullname, &newUser.About, &newUser.Email)
 
@@ -64,8 +74,7 @@ func (u *UserRepository) ChangeUser(user models.User) (models.User, error) {
 func (u UserRepository) GetUser(nickname string) (models.User, error) {
 	var user models.User = models.User{Nickname: nickname}
 
-	err := u.DB.QueryRow(`SELECT u.nickname, u.fullname, u.about, u.email FROM parkmaildb."User" u WHERE u.nickname = $1`,
-		nickname).Scan(&user.Nickname, &user.Fullname, &user.About, &user.Email)
+	err := u.DB.QueryRow("SelectUserByNick", nickname).Scan(&user.Nickname, &user.Fullname, &user.About, &user.Email)
 	if err != nil {
 		log.Println(err)
 		return models.User{}, err

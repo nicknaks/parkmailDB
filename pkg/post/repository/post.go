@@ -29,11 +29,13 @@ func (p PostRepository) ParseRowsToPost(rows *pgx.Rows) ([]models.Post, bool) {
 		err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created)
 		if err != nil {
 			log.Println(err)
+			rows.Close()
 			return posts, false
 		}
 		posts = append(posts, post)
 	}
 
+	rows.Close()
 	return posts, true
 }
 
@@ -43,18 +45,17 @@ func (p PostRepository) GetPostsTree(id int, limit int, since int, desc bool) ([
 
 	if since == 0 {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY path DESC, id DESC LIMIT $2`, id, limit)
+			rows, err = p.DB.Query("GetPostsTreeDesc", id, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY path, id LIMIT $2`, id, limit)
+			rows, err = p.DB.Query("GetPostsTree", id, limit)
 		}
 	} else {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND path < (SELECT path FROM parkmaildb."Post" where id = $2) ORDER BY path DESC , id DESC LIMIT $3`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsTreeSinceDesc", id, since, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND path > (SELECT path FROM parkmaildb."Post" where id = $2) ORDER BY path, id LIMIT $3`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsTreeSince", id, since, limit)
 		}
 	}
-
 	if err != nil {
 		return []models.Post{}, false
 	}
@@ -62,21 +63,46 @@ func (p PostRepository) GetPostsTree(id int, limit int, since int, desc bool) ([
 	return p.ParseRowsToPost(rows)
 }
 
+const (
+	GetPostsTreeDesc      = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY path DESC, id DESC LIMIT $2`
+	GetPostsTree          = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY path, id LIMIT $2`
+	GetPostsTreeSinceDesc = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND path < (SELECT path FROM parkmaildb."Post" where id = $2) ORDER BY path DESC , id DESC LIMIT $3`
+	GetPostsTreeSince     = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND path > (SELECT path FROM parkmaildb."Post" where id = $2) ORDER BY path, id LIMIT $3`
+
+	GetPostsParentDesc      = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 ORDER BY id DESC LIMIT $2) ORDER BY path[1] DESC, path, id`
+	GetPostsParent          = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 ORDER BY id LIMIT $2) ORDER BY path, id`
+	GetPostsParentSinceDesc = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 AND path[1] < (SELECT path[1] FROM parkmaildb."Post" WHERE id = $2) ORDER BY id DESC LIMIT $3) ORDER BY path[1] DESC, path, id`
+	GetPostsParentSince     = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 AND path[1] > (SELECT path[1] FROM parkmaildb."Post" WHERE id = $2) ORDER BY id LIMIT $3) ORDER BY path, id`
+
+	GetPostsFlatDesc      = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY id DESC LIMIT $2`
+	GetPostsFlat          = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY id LIMIT $2`
+	GetPostsFlatSinceDesc = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND id < $2 ORDER BY id DESC LIMIT $3`
+	GetPostsFlatSince     = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND id > $2 ORDER BY id LIMIT $3`
+
+	SelectPostInfo       = `SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE id = $1`
+	SelectPostInfoUser   = `SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1`
+	SelectPostInfoThread = `SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE id = $1`
+	SelectPostInfoForum  = `SELECT title, "user", slug, posts, threads FROM parkmaildb."Forum" WHERE slug = $1`
+
+	UpdatePost    = `UPDATE parkmaildb."Post" SET message = COALESCE(NULLIF($1, ''), message), isedited = CASE WHEN $1 = '' OR message=$1 THEN isedited else true end WHERE id = $2 RETURNING id, parent, author, message, isedited, forum, thread, created`
+	GetPostParent = `SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND id = $2`
+)
+
 func (p PostRepository) GetPostsParentTree(id int, limit int, since int, desc bool) ([]models.Post, bool) {
 	var rows *pgx.Rows
 	var err error
 
 	if since == 0 {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 ORDER BY id DESC LIMIT $2) ORDER BY path[1] DESC, path, id`, id, limit)
+			rows, err = p.DB.Query("GetPostsParentDesc", id, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 ORDER BY id LIMIT $2) ORDER BY path, id`, id, limit)
+			rows, err = p.DB.Query("GetPostsParent", id, limit)
 		}
 	} else {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 AND path[1] < (SELECT path[1] FROM parkmaildb."Post" WHERE id = $2) ORDER BY id DESC LIMIT $3) ORDER BY path[1] DESC, path, id`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsParentSinceDesc", id, since, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE path[1] IN (SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND parent = 0 AND path[1] > (SELECT path[1] FROM parkmaildb."Post" WHERE id = $2) ORDER BY id LIMIT $3) ORDER BY path, id`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsParentSince", id, since, limit)
 		}
 	}
 
@@ -93,15 +119,15 @@ func (p PostRepository) GetAllPostByThread(id int, limit int, since int, desc bo
 
 	if since == 0 {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY id DESC LIMIT $2`, id, limit)
+			rows, err = p.DB.Query("GetPostsFlatDesc", id, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 ORDER BY id LIMIT $2`, id, limit)
+			rows, err = p.DB.Query("GetPostsFlat", id, limit)
 		}
 	} else {
 		if desc {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND id < $2 ORDER BY id DESC LIMIT $3`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsFlatSinceDesc", id, since, limit)
 		} else {
-			rows, err = p.DB.Query(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE thread = $1 AND id > $2 ORDER BY id LIMIT $3`, id, since, limit)
+			rows, err = p.DB.Query("GetPostsFlatSince", id, since, limit)
 		}
 	}
 
@@ -120,7 +146,7 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 	forum := models.Forum{}
 	thread := models.Thread{}
 
-	err := p.DB.QueryRow(`SELECT id, parent, author, message, isedited, forum, thread, created FROM parkmaildb."Post" WHERE id = $1`, id).
+	err := p.DB.QueryRow("SelectPostInfo", id).
 		Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created)
 	if err != nil {
 		log.Println(err)
@@ -129,7 +155,7 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 	info.Post = &post
 
 	if params.User {
-		err = p.DB.QueryRow(`SELECT nickname, fullname, about, email FROM parkmaildb."User" WHERE nickname = $1`, post.Author).
+		err = p.DB.QueryRow("SelectPostInfoUser", post.Author).
 			Scan(&user.Nickname, &user.Fullname, &user.About, &user.Email)
 		if err != nil {
 			return models.FullPost{}, false
@@ -138,7 +164,7 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 	}
 
 	if params.Thread {
-		err = p.DB.QueryRow(`SELECT id, title, author, forum, message, votes, slug, created FROM parkmaildb."Thread" WHERE id = $1`, post.Thread).
+		err = p.DB.QueryRow("SelectPostInfoThread", post.Thread).
 			Scan(&thread.Id, &thread.Title, &thread.Author, &thread.Forum, &thread.Message, &thread.Votes, &thread.Slug, &thread.Created)
 		if err != nil {
 			return models.FullPost{}, false
@@ -147,7 +173,7 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 	}
 
 	if params.Forum {
-		err = p.DB.QueryRow(`SELECT title, "user", slug, posts, threads FROM parkmaildb."Forum" WHERE slug = $1`, post.Forum).
+		err = p.DB.QueryRow("SelectPostInfoForum", post.Forum).
 			Scan(&forum.Title, &forum.User, &forum.Slug, &forum.Posts, &forum.Threads)
 		if err != nil {
 			return models.FullPost{}, false
@@ -160,7 +186,7 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 
 func (p PostRepository) ChangePost(updateMessage models.PostUpdate, id int) (models.Post, bool) {
 	var post models.Post
-	err := p.DB.QueryRow(`UPDATE parkmaildb."Post" SET message = COALESCE(NULLIF($1, ''), message), isedited = CASE WHEN $1 = '' OR message=$1 THEN isedited else true end WHERE id = $2 RETURNING id, parent, author, message, isedited, forum, thread, created`, updateMessage.Message, id).
+	err := p.DB.QueryRow("UpdatePost", updateMessage.Message, id).
 		Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created)
 
 	if err != nil {
@@ -184,7 +210,7 @@ func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName str
 	for i, post := range posts {
 		if post.Parent != 0 {
 			id := -1
-			err := p.DB.QueryRow(`SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND id = $2`, threadId, post.Parent).Scan(&id)
+			err := p.DB.QueryRow("GetPostParent", threadId, post.Parent).Scan(&id)
 			if err == pgx.ErrNoRows {
 				return nil, errors.New("Cant Find Parent")
 			}
@@ -212,6 +238,7 @@ func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName str
 		log.Println(1)
 		log.Println(post)
 		if err != nil || post.Author == "" {
+			rows.Close()
 			return nil, err
 		}
 
@@ -219,8 +246,10 @@ func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName str
 	}
 
 	if len(insertedPosts) == 0 {
+		rows.Close()
 		return nil, errors.New(models.ErrUserUnknown)
 	}
 
+	rows.Close()
 	return insertedPosts, nil
 }
