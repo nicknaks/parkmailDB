@@ -130,3 +130,23 @@ $$ LANGUAGE 'plpgsql';
 CREATE TRIGGER add_post
     BEFORE INSERT ON parkmaildb."Post"
     FOR EACH ROW EXECUTE PROCEDURE add_post();
+
+CREATE INDEX IF NOT EXISTS user_nick ON parkmaildb."User" (nickname);
+CREATE INDEX IF NOT EXISTS user_email ON parkmaildb."User" (email);
+
+CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" (slug);
+
+CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" (slug);
+CREATE INDEX IF NOT EXISTS thread_forum ON parkmaildb."Thread" (forum);
+CREATE INDEX IF NOT EXISTS thread_author ON parkmaildb."Thread" (author);
+CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
+
+CREATE INDEX IF NOT EXISTS post_threadId ON parkmaildb."Post" (thread);
+CREATE INDEX IF NOT EXISTS post_forum ON parkmaildb."Post" (forum);
+CREATE INDEX IF NOT EXISTS post_created ON parkmaildb."Post" (created);
+CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" ((path[1]));
+
+CREATE INDEX IF NOT EXISTS vode_thread_user ON parkmaildb."Vote" (threadid, "user");
+
+CREATE INDEX IF NOT EXISTS users_by_forum_nick ON parkmaildb."Users_by_Forum" ("user");
+CREATE INDEX IF NOT EXISTS users_by_forum_forum ON parkmaildb."Users_by_Forum" ("forum");

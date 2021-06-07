@@ -140,7 +140,7 @@ func (u PostUsecase) CreatePosts(posts models.Posts, threadId int, forumName str
 	}
 
 	code := utils.PgxErrorCode(err)
-	if code == "23503" {
+	if code == "23503" || err.Error() == models.ErrUserUnknown {
 		return []models.Post{}, http.StatusNotFound, errors.New(models.ErrUserUnknown)
 	}
 

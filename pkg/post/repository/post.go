@@ -2,10 +2,12 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"forum/pkg/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"log"
+	"strings"
 )
 
 type PostRepositoryInterface interface {
@@ -172,41 +174,53 @@ func (p PostRepository) ChangePost(updateMessage models.PostUpdate, id int) (mod
 
 func (p PostRepository) AddPosts(posts models.Posts, threadId int, forumName string) (models.Posts, error) {
 	var insertedPosts models.Posts
-	begin, err := p.DB.Beginx()
-	if err != nil {
-		log.Println(err)
-		return nil, err
+
+	var sqlValues []interface{}
+	sqlQuery := `INSERT INTO parkmaildb."Post" (PARENT, AUTHOR, MESSAGE, FORUM, THREAD) VALUES `
+
+	if len(posts) == 0 {
+		return models.Posts{}, nil
 	}
 
-	for _, post := range posts {
+	for i, post := range posts {
 		if post.Parent != 0 {
 			id := -1
-			err = p.DB.QueryRowx(`SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND id = $2`, threadId, post.Parent).Scan(&id)
+			err := p.DB.QueryRowx(`SELECT id FROM parkmaildb."Post" WHERE thread = $1 AND id = $2`, threadId, post.Parent).Scan(&id)
 			if err == sql.ErrNoRows {
-				begin.Rollback()
 				return nil, errors.New("Cant Find Parent")
 			}
 		}
 
-		var insertedPost models.Post
+		sqlValuesString := fmt.Sprintf("($%d, $%d, $%d, $%d, $%d),", i*5+1, i*5+2, i*5+3, i*5+4, i*5+5)
 
-		err = begin.QueryRowx(`INSERT INTO parkmaildb."Post" (PARENT, AUTHOR, MESSAGE, ISEDITED, FORUM, THREAD, CREATED) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, parent, author, message, isedited, forum, thread, created`,
-			post.Parent, post.Author, post.Message, false, forumName, threadId, post.Created).
-			Scan(&insertedPost.Id, &insertedPost.Parent, &insertedPost.Author, &insertedPost.Message, &insertedPost.IsEdited, &insertedPost.Forum, &insertedPost.Thread, &insertedPost.Created)
+		sqlQuery += sqlValuesString
+		sqlValues = append(sqlValues, post.Parent, post.Author, post.Message, forumName, threadId)
+	}
 
-		if err != nil {
-			log.Println(err)
-			begin.Rollback()
+	sqlQuery = strings.TrimSuffix(sqlQuery, ",")
+	sqlQuery += ` RETURNING id, parent, author, message, isedited, forum, thread, created;`
+
+	rows, err := p.DB.Query(sqlQuery, sqlValues...)
+
+	if err != nil {
+		return nil, errors.New("Cant Find Parent")
+	}
+
+	for rows.Next() {
+		post := models.Post{}
+
+		err := rows.Scan(&post.Id, &post.Parent, &post.Author, &post.Message, &post.IsEdited, &post.Forum, &post.Thread, &post.Created)
+		log.Println(1)
+		log.Println(post)
+		if err != nil || post.Author == "" {
 			return nil, err
 		}
 
-		insertedPosts = append(insertedPosts, insertedPost)
+		insertedPosts = append(insertedPosts, post)
 	}
-	err = begin.Commit()
-	if err != nil {
-		log.Println(err)
-		begin.Rollback()
-		return nil, err
+
+	if len(insertedPosts) == 0 {
+		return nil, errors.New(models.ErrUserUnknown)
 	}
 
 	return insertedPosts, nil

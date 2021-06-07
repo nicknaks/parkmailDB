@@ -8,6 +8,7 @@ import (
 
 func getPostgres() *sql.DB {
 	db, err := sql.Open("pgx", "dbname=docker user=docker password=docker host=127.0.0.1 port=5432 sslmode=disable")
+	//db, err := sql.Open("pgx", "dbname=postgres host=127.0.0.1 port=5432 sslmode=disable")
 	if err != nil {
 		panic("cant parse config" + err.Error())
 	}
