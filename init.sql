@@ -39,7 +39,6 @@ CREATE TABLE parkmaildb."Thread"
     Votes INT,
     Slug CITEXT UNIQUE DEFAULT citext(1),
     Created TIMESTAMP WITH TIME ZONE
---     CONSTRAINT uniq UNIQUE (Title, Forum)
 );
 
 CREATE TABLE parkmaildb."Post"
@@ -139,11 +138,11 @@ CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" (slug);
 CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" (slug);
 -- CREATE INDEX IF NOT EXISTS thread_forum ON parkmaildb."Thread" (forum);
 -- CREATE INDEX IF NOT EXISTS thread_author ON parkmaildb."Thread" (author);
-CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
+-- CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
 
 -- CREATE INDEX IF NOT EXISTS post_threadId ON parkmaildb."Post" (thread);
 -- CREATE INDEX IF NOT EXISTS post_forum ON parkmaildb."Post" (forum);
-CREATE INDEX IF NOT EXISTS post_created ON parkmaildb."Post" (created);
+-- CREATE INDEX IF NOT EXISTS post_created ON parkmaildb."Post" (created);
 CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" ((path[1]));
 
 -- CREATE INDEX IF NOT EXISTS vode_thread_user ON parkmaildb."Vote" (threadid, "user");
