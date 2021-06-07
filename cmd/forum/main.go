@@ -55,7 +55,7 @@ func config() *http.Server {
 
 	//router
 	mainRouter := mux.NewRouter()
-	subRouter := mainRouter.NewRoute().Subrouter()
+	subRouter := mainRouter.PathPrefix("/api").Subrouter()
 	subRouter.Use(loggerM.Middleware)
 
 	user.SetHandlersForUsers(subRouter)
