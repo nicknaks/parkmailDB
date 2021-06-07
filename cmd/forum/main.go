@@ -33,6 +33,9 @@ func config() *http.Server {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if Db.ProcedureRequests() != nil {
+		log.Fatal(err)
+	}
 
 	userUsecase := usecase.UserUsecase{DB: &repostitory.UserRepository{DB: Db.GetPostgres()}}
 	forumUsecase := usecase2.ForumUsecase{DB: &repository2.ForumRepository{DB: Db.GetPostgres()}}

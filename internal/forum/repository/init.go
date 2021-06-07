@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"forum/pkg/forum/repository"
 	"github.com/jackc/pgx"
 )
 
@@ -37,5 +38,29 @@ func (p *Postgres) GetPostgres() *pgx.ConnPool {
 
 func (p *Postgres) Close() error {
 	p.DB.Close()
+	return nil
+}
+
+func (p *Postgres) ProcedureRequests() error {
+	//forum
+	if _, err := p.DB.Prepare("SelectUsersByForumDesc", repository.SelectUsersByForumDesc); err != nil {
+		return err
+	}
+	if _, err := p.DB.Prepare("SelectUsersByForumSince", repository.SelectUsersByForumSince); err != nil {
+		return err
+	}
+	if _, err := p.DB.Prepare("SelectUsersByForumSinceDesc", repository.SelectUsersByForumSinceDesc); err != nil {
+		return err
+	}
+	if _, err := p.DB.Prepare("SelectForum", repository.SelectForum); err != nil {
+		return err
+	}
+	if _, err := p.DB.Prepare("SelectUsersByForum", repository.SelectUsersByForum); err != nil {
+		return err
+	}
+	if _, err := p.DB.Prepare("InsertForum", repository.InsertForum); err != nil {
+		return err
+	}
+
 	return nil
 }
