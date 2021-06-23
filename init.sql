@@ -130,17 +130,22 @@ CREATE TRIGGER add_post
     BEFORE INSERT ON parkmaildb."Post"
     FOR EACH ROW EXECUTE PROCEDURE add_post();
 
-CREATE INDEX IF NOT EXISTS user_nick ON parkmaildb."User" (nickname);
-CREATE INDEX IF NOT EXISTS user_email ON parkmaildb."User" (email);
 
-CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" (slug);
+CREATE INDEX IF NOT EXISTS user_nick ON parkmaildb."User" USING hash (nickname);
+CREATE INDEX IF NOT EXISTS user_email ON parkmaildb."User" USING hash(email);
 
-CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" (slug);
+CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" USING hash(slug);
+
+CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" USING hash(slug);
 CREATE INDEX IF NOT EXISTS thread_forum ON parkmaildb."Thread" (forum);
-CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
+CREATE INDEX IF NOT EXISTS thread_created_forum ON parkmaildb."Thread" (forum, created);
 
 CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" ((path[1]));
+CREATE INDEX IF NOT EXISTS post_thread ON parkmaildb."Post" (thread);
+CREATE INDEX IF NOT EXISTS post_path ON parkmaildb."Post" (path);
+CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" (forum);
 
 CREATE UNIQUE INDEX IF NOT EXISTS votes_nickname_thread_nickname on parkmaildb."Vote" (threadid, "user");
+
 CREATE INDEX forum_users_user ON parkmaildb."Users_by_Forum" USING hash ("user");
-CREATE INDEX forum_users_forum ON parkmaildb."Users_by_Forum" USING hash (forum);
+CREATE INDEX forum_users_forum_user ON parkmaildb."Users_by_Forum" USING hash (forum, "user");
