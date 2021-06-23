@@ -136,4 +136,11 @@ CREATE INDEX IF NOT EXISTS user_email ON parkmaildb."User" (email);
 CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" (slug);
 
 CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" (slug);
+CREATE INDEX IF NOT EXISTS thread_forum ON parkmaildb."Thread" (forum);
+CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
+
 CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" ((path[1]));
+
+CREATE UNIQUE INDEX IF NOT EXISTS votes_nickname_thread_nickname on parkmaildb."Vote" (threadid, "user");
+CREATE INDEX forum_users_user ON parkmaildb."Users_by_Forum" USING hash ("user");
+CREATE INDEX forum_users_forum ON parkmaildb."Users_by_Forum" USING hash (forum);
