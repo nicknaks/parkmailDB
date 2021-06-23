@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"forum/internal/utils/utils"
 	"forum/pkg/models"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -169,6 +170,10 @@ func (p PostRepository) GetAllInfo(params models.FullPostParams, id int) (models
 		if err != nil {
 			return models.FullPost{}, false
 		}
+		if utils.IsValidUUID(thread.Slug) {
+			thread.Slug = ""
+		}
+
 		info.Thread = &thread
 	}
 
