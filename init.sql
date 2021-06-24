@@ -100,7 +100,6 @@ CREATE TRIGGER voice_trigger
 -- Изменение голоса
 CREATE OR REPLACE FUNCTION change_voice() RETURNS TRIGGER AS $$
 BEGIN
-
     IF old.value <> new.value
     THEN UPDATE parkmaildb."Thread" t SET votes = (t.votes + new.value * 2) WHERE t.Id = New.threadid;
     END IF;
@@ -115,7 +114,7 @@ CREATE TRIGGER voice_update_trigger
 -- Добавление поста
 CREATE OR REPLACE FUNCTION add_post() RETURNS TRIGGER AS $$
 BEGIN
-    --     увеличить счетчик постов в форуме
+--     увеличить счетчик постов в форуме
     UPDATE parkmaildb."Forum" SET posts = posts + 1 WHERE Slug = NEW.forum;
 --     добавить пользователя в таблицу форум-user
     INSERT INTO parkmaildb."Users_by_Forum" (forum, "user") VALUES (NEW.forum, NEW.author)
@@ -138,9 +137,11 @@ CREATE INDEX IF NOT EXISTS forum_slug ON parkmaildb."Forum" USING hash(slug);
 
 CREATE INDEX IF NOT EXISTS thread_slug ON parkmaildb."Thread" USING hash(slug);
 CREATE INDEX IF NOT EXISTS thread_forum ON parkmaildb."Thread" (forum);
+CREATE INDEX IF NOT EXISTS thread_created ON parkmaildb."Thread" (created);
 CREATE INDEX IF NOT EXISTS thread_created_forum ON parkmaildb."Thread" (forum, created);
 
 CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" ((path[1]));
+CREATE INDEX IF NOT EXISTS post_id_path1 on parkmaildb."Post" (id, (path[1]));
 CREATE INDEX IF NOT EXISTS post_thread ON parkmaildb."Post" (thread);
 CREATE INDEX IF NOT EXISTS post_path ON parkmaildb."Post" (path);
 CREATE INDEX IF NOT EXISTS post_path_1 ON parkmaildb."Post" (forum);
